@@ -136,7 +136,7 @@ async function startTwitterMirroring() {
         }
   
         console.log("Scheduling next fetch in 60 seconds");
-        setTimeout(fetchAndProcessTweeets, 60000); // Fetch every 60 seconds
+        setTimeout(fetchAndProcessTweets, 60000); // Corrected function name
       }
   
       fetchAndProcessTweets();
