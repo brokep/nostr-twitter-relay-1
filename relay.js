@@ -106,27 +106,27 @@ async function startTwitterMirroring() {
       const appOnlyClient = await twitterClient.appLogin();
       console.log("Authentication successful");
   
-      let lastTweetId = null;
+      let newestId = null;
   
       async function fetchAndProcessTweets() {
         try {
           console.log(`Fetching tweets for @${username}`);
-          const tweets = await appOnlyClient.v1.userTimeline(username, {
-            exclude_replies: true,
-            include_rts: false,
-            count: 10,
-            since_id: lastTweetId
+          const query = `from:${username} -is:retweet -is:reply`;
+          const tweets = await appOnlyClient.v2.search(query, {
+            'tweet.fields': 'created_at',
+            max_results: 10,
+            since_id: newestId
           });
   
-          console.log(`Fetched ${tweets.length} new tweets`);
+          console.log(`Fetched ${tweets.data.length} new tweets`);
   
-          for (const tweet of tweets) {
+          for (const tweet of tweets.data) {
             console.log(`Processing tweet: ${tweet.text}`);
             await postToNostr(tweet.text);
           }
   
-          if (tweets.length > 0) {
-            lastTweetId = tweets[0].id_str;
+          if (tweets.data.length > 0) {
+            newestId = tweets.meta.newest_id;
           }
         } catch (error) {
           console.error('Error fetching tweets:', error);
@@ -136,7 +136,7 @@ async function startTwitterMirroring() {
         }
   
         console.log("Scheduling next fetch in 60 seconds");
-        setTimeout(fetchAndProcessTweets, 60000); // Fetch every 60 seconds
+        setTimeout(fetchAndProcessTweeets, 60000); // Fetch every 60 seconds
       }
   
       fetchAndProcessTweets();
