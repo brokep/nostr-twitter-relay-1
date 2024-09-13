@@ -97,59 +97,57 @@ async function postToNostr(content) {
 }
 
 async function startTwitterMirroring() {
-  const username = process.env.TWITTER_USERNAME;
+    const username = process.env.TWITTER_USERNAME;
+    
+    console.log(`Attempting to mirror tweets from @${username}`);
   
-  console.log(`Attempting to mirror tweets from @${username}`);
-
-  try {
-    console.log("Authenticating with Twitter...");
-    const appOnlyClient = await twitterClient.appLogin();
-    console.log("Authentication successful");
-
-    console.log("Fetching user data...");
-    const user = await appOnlyClient.v2.userByUsername(username);
-    console.log(`User data fetched for @${username}, ID: ${user.data.id}`);
-
-    let lastTweetId = null;
-
-    async function fetchAndProcessTweets() {
-      try {
-        console.log(`Fetching tweets for user ID: ${user.data.id}`);
-        const tweets = await appOnlyClient.v2.userTimeline(user.data.id, {
-          exclude: ['retweets', 'replies'],
-          max_results: 10,
-          since_id: lastTweetId
-        });
-
-        console.log(`Fetched ${tweets.data.data ? tweets.data.data.length : 0} new tweets`);
-
-        if (tweets.data.data && tweets.data.data.length > 0) {
-          for (const tweet of tweets.data.data) {
+    try {
+      console.log("Authenticating with Twitter...");
+      const appOnlyClient = await twitterClient.appLogin();
+      console.log("Authentication successful");
+  
+      let lastTweetId = null;
+  
+      async function fetchAndProcessTweets() {
+        try {
+          console.log(`Fetching tweets for @${username}`);
+          const tweets = await appOnlyClient.v1.userTimeline(username, {
+            exclude_replies: true,
+            include_rts: false,
+            count: 10,
+            since_id: lastTweetId
+          });
+  
+          console.log(`Fetched ${tweets.length} new tweets`);
+  
+          for (const tweet of tweets) {
             console.log(`Processing tweet: ${tweet.text}`);
             await postToNostr(tweet.text);
           }
-          lastTweetId = tweets.data.meta.newest_id;
+  
+          if (tweets.length > 0) {
+            lastTweetId = tweets[0].id_str;
+          }
+        } catch (error) {
+          console.error('Error fetching tweets:', error);
+          if (error.data) {
+            console.error('Error details:', JSON.stringify(error.data, null, 2));
+          }
         }
-      } catch (error) {
-        console.error('Error fetching tweets:', error);
-        if (error.data) {
-          console.error('Error details:', JSON.stringify(error.data, null, 2));
-        }
+  
+        console.log("Scheduling next fetch in 60 seconds");
+        setTimeout(fetchAndProcessTweets, 60000); // Fetch every 60 seconds
       }
-
-      console.log("Scheduling next fetch in 60 seconds");
-      setTimeout(fetchAndProcessTweets, 60000); // Fetch every 60 seconds
-    }
-
-    fetchAndProcessTweets();
-
-  } catch (error) {
-    console.error('Error in startTwitterMirroring:', error);
-    if (error.data) {
-      console.error('Error details:', JSON.stringify(error.data, null, 2));
+  
+      fetchAndProcessTweets();
+  
+    } catch (error) {
+      console.error('Error in startTwitterMirroring:', error);
+      if (error.data) {
+        console.error('Error details:', JSON.stringify(error.data, null, 2));
+      }
     }
   }
-}
 
 const server = app.listen(3000, () => {
   console.log('Nostr relay is running on port 3000');
